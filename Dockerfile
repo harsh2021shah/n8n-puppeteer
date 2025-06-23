@@ -1,10 +1,9 @@
-# Use Debian-based Node image
+# Base image
 FROM node:18-bullseye
 
-# Switch to root
 USER root
 
-# Update and install system packages
+# Install core dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -21,39 +20,45 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Google Chrome repo and install
+# Install Chrome browser (Stable)
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/googlechrome-linux-keyring.gpg && \
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/googlechrome-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list && \
     apt-get update && \
     apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver (Chrome for Testing matching installed version)
-RUN CFT_BASE_URL="https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" && \
-    CFT_VERSION=$(curl -s $CFT_BASE_URL | python3 -c "import sys, json; print(json.load(sys.stdin)['channels']['Stable']['version'])") && \
-    DRIVER_URL=$(curl -s $CFT_BASE_URL | python3 -c "import sys, json; print(json.load(sys.stdin)['channels']['Stable']['downloads']['chromedriver']['linux64']['url'])") && \
+# 🧪 Test block: Fetch ChromeDriver (Chrome for Testing) in separate steps
+RUN curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json -o /tmp/versions.json
+
+RUN python3 -c "import sys, json; data = json.load(open('/tmp/versions.json')); print('✔ Chrome for Testing Stable Version:', data['channels']['Stable']['version'])"
+
+RUN python3 -c "import sys, json; data = json.load(open('/tmp/versions.json')); print('✔ ChromeDriver URL:', data['channels']['Stable']['downloads']['chromedriver']['linux64']['url'])"
+
+# 🧩 Actual ChromeDriver install (now that URL is confirmed)
+RUN DRIVER_URL=$(python3 -c "import sys, json; print(json.load(open('/tmp/versions.json'))['channels']['Stable']['downloads']['chromedriver']['linux64']['url'])") && \
     wget -O /tmp/chromedriver.zip "$DRIVER_URL" && \
     unzip /tmp/chromedriver.zip -d /tmp && \
     mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
     chmod +x /usr/local/bin/chromedriver && \
-    rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
+    rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64 /tmp/versions.json
 
-# Install Python packages
-RUN pip3 install --no-cache-dir selenium webdriver-manager requests
+# Install required Python packages
+RUN pip3 install --no-cache-dir \
+    selenium \
+    webdriver-manager \
+    requests
 
 # Install n8n globally
 RUN npm install -g n8n
 
-# Set environment variables
+# Environment config
 ENV CHROME_BIN=/usr/bin/google-chrome-stable
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# Set working directory
+# Working directory and port
 WORKDIR /home/node
-
-# Expose n8n port
 EXPOSE 5678
 
 # Start n8n
