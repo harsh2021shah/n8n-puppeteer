@@ -4,30 +4,43 @@ FROM n8nio/n8n:latest
 # Switch to root to install packages
 USER root
 
-# Install Python, Firefox, and system dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    firefox-esr \
+# Update package list and install dependencies separately for better error handling
+RUN apt-get update
+
+# Install basic dependencies first
+RUN apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
+    curl
+
+# Install Python and pip
+RUN apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-setuptools
+
+# Install Firefox and X11 dependencies
+RUN apt-get install -y \
+    firefox-esr \
     xvfb \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    libgtk-3-0 \
+    libdbus-glib-1-2
 
-# Install Python packages globally (since we're in a container)
+# Clean up apt cache
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean
+
+# Upgrade pip and install Python packages
+RUN python3 -m pip install --upgrade pip
+
+# Install Python packages for web scraping
 RUN pip3 install --no-cache-dir \
-    selenium \
-    webdriver-manager \
-    gspread \
-    oauth2client \
-    requests
+    selenium==4.15.0 \
+    webdriver-manager==4.0.1 \
+    requests==2.31.0
 
-# Download and install geckodriver (Firefox WebDriver)
-RUN GECKODRIVER_VERSION=$(wget -qO- "https://api.github.com/repos/mozilla/geckodriver/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")') && \
-    wget -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/$GECKODRIVER_VERSION/geckodriver-$GECKODRIVER_VERSION-linux64.tar.gz" && \
+# Download and install geckodriver manually with fixed version
+RUN wget -O /tmp/geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/v0.33.0/geckodriver-v0.33.0-linux64.tar.gz" && \
     tar -xzf /tmp/geckodriver.tar.gz -C /tmp && \
     mv /tmp/geckodriver /usr/local/bin/geckodriver && \
     chmod +x /usr/local/bin/geckodriver && \
@@ -35,11 +48,6 @@ RUN GECKODRIVER_VERSION=$(wget -qO- "https://api.github.com/repos/mozilla/geckod
 
 # Set environment variables for headless operation
 ENV DISPLAY=:99
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
-
-# Create directory for Python scripts
-RUN mkdir -p /home/node/scripts && \
-    chown -R node:node /home/node/scripts
 
 # Switch back to node user for security
 USER node
