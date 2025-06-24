@@ -1,52 +1,61 @@
+# Use Node.js base image
 FROM node:18-bullseye
 
+# Switch to root to install system-level packages
 USER root
 
-# Install system dependencies
+# Install dependencies for Puppeteer and Chrome
 RUN apt-get update && apt-get install -y \
-    wget curl unzip gnupg ca-certificates apt-transport-https \
-    software-properties-common python3 python3-pip python3-dev \
-    fonts-liberation fonts-dejavu-core fontconfig \
-    libasound2 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
-    libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-    libpango-1.0-0 libpangocairo-1.0-0 libgtk-3-0 \
-    libnss3 libxss1 libxtst6 xdg-utils && \
+    wget \
+    curl \
+    gnupg \
+    ca-certificates \
+    fonts-liberation \
+    fonts-dejavu-core \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgtk-3-0 \
+    libnss3 \
+    libxss1 \
+    libxtst6 \
+    xdg-utils \
+    python3 \
+    python3-pip \
+    python3-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome 114 using UChicago mirror
+# Install Chrome (version 114)
 RUN wget -O /tmp/google-chrome.deb \
     https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.90-1_amd64.deb && \
-    apt-get update && \
     apt-get install -y /tmp/google-chrome.deb && \
     rm /tmp/google-chrome.deb
 
-# Install ChromeDriver 114.0.5735.90
-RUN wget -O /tmp/chromedriver.zip \
-    https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip && \
-    unzip /tmp/chromedriver.zip -d /tmp && \
-    mv /tmp/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver && \
-    rm -rf /tmp/chromedriver.zip
+# Install Puppeteer and required Python modules for coordination (optional)
+RUN npm install -g n8n puppeteer && \
+    pip3 install --no-cache-dir requests
 
-# Install Python libs for Selenium automation
-RUN pip3 install --no-cache-dir selenium webdriver-manager requests
-
-# Install n8n CLI
-RUN npm install -g n8n
-
-# Copy the Python scraper script
-COPY 9gag_scraper_chrome.py /home/node/9gag_scraper_chrome.py
-RUN chmod +x /home/node/9gag_scraper_chrome.py
-
-# Set environment variables for Puppeteer/Selenium
-ENV CHROME_BIN=/usr/bin/google-chrome \
-    CHROMEDRIVER_PATH=/usr/local/bin/chromedriver \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome \
+# Set Puppeteer environment variables
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# Set working directory & expose port
+# Copy the Puppeteer scraper script
+COPY 9gag_scraper_puppeteer.js /home/node/9gag_scraper_puppeteer.js
+RUN chmod +x /home/node/9gag_scraper_puppeteer.js
+
+# Set working directory & permissions
 WORKDIR /home/node
+USER node
+
+# Expose n8n port
 EXPOSE 5678
 
-# Run n8n
+# Start n8n
 CMD ["n8n"]
