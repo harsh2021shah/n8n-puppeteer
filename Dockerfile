@@ -32,10 +32,11 @@ RUN apt-get update && apt-get install -y \
     python3-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Chrome (version 114)
+# Install Google Chrome 114 using verified mirror with fallback dependency fix
 RUN wget -O /tmp/google-chrome.deb \
     https://mirror.cs.uchicago.edu/google-chrome/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.90-1_amd64.deb && \
-    apt-get install -y /tmp/google-chrome.deb && \
+    apt-get update && \
+    apt-get install -y /tmp/google-chrome.deb || apt-get -fy install && \
     rm /tmp/google-chrome.deb
 
 # Install Puppeteer and required Python modules for coordination (optional)
