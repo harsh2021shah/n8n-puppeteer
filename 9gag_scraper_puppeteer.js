@@ -1,6 +1,9 @@
 const puppeteer = require("puppeteer");
 
 async function scrape9Gag(category = "funny", postsCount = 2) {
+  console.log("🚀 Starting 9GAG Scraper");
+  console.log(`🔍 Target category: ${category}, Posts to scrape: ${postsCount}`);
+
   const browser = await puppeteer.launch({
     headless: "new",
     args: [
@@ -13,20 +16,28 @@ async function scrape9Gag(category = "funny", postsCount = 2) {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome",
   });
 
+  console.log("✅ Browser launched");
+
   const page = await browser.newPage();
   await page.setUserAgent(
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.90 Safari/537.36"
   );
+  console.log("🧭 New page opened and User-Agent set");
 
   const postsData = [];
 
   try {
     const url = `https://9gag.com/tag/${category}`;
+    console.log(`🌐 Navigating to ${url}`);
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    console.log("✅ Page loaded successfully");
 
     let scrollTries = 0;
+
     while (postsData.length < postsCount && scrollTries < 30) {
+      console.log(`🔁 Scroll attempt ${scrollTries + 1}`);
       const articles = await page.$$("article");
+      console.log(`🔎 Found ${articles.length} articles`);
 
       for (const article of articles) {
         if (postsData.length >= postsCount) break;
@@ -45,6 +56,8 @@ async function scrape9Gag(category = "funny", postsCount = 2) {
         const tags = await article.$$eval(".post-tags a", els => els.map(el => el.textContent.trim()).join(", ")).catch(() => "");
         const mainTag = await article.$eval(".post-meta__list-view .name", el => el.innerText).catch(() => "");
 
+        console.log(`📌 Post scraped: ${title}`);
+
         postsData.push({
           title,
           video_url: videoSrc,
@@ -53,6 +66,11 @@ async function scrape9Gag(category = "funny", postsCount = 2) {
           tags,
           post_url: postUrl,
         });
+
+        if (postsData.length >= postsCount) {
+          console.log("✅ Desired number of posts scraped");
+          break;
+        }
       }
 
       await page.evaluate(() => window.scrollBy(0, 1000));
@@ -60,13 +78,16 @@ async function scrape9Gag(category = "funny", postsCount = 2) {
       scrollTries++;
     }
   } catch (err) {
-    console.error("Scraping error:", err);
+    console.error("❌ Scraping error:", err);
     process.exit(1);
   } finally {
     await browser.close();
+    console.log("🧹 Browser closed");
   }
 
+  console.log("✅ Scraping complete. Returning results:\n");
   console.log(JSON.stringify(postsData, null, 2));
+  process.exit(0);
 }
 
 // Get arguments from command line
