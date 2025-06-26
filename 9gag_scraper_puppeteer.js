@@ -79,18 +79,25 @@ async function scrape9Gag(category = "funny", postsCount = 2) {
     }
   } catch (err) {
     console.error("❌ Scraping error:", err);
-    process.exit(1);
   } finally {
     await browser.close();
     console.log("🧹 Browser closed");
   }
 
-  console.log("✅ Scraping complete. Returning results:\n");
-  console.log(JSON.stringify(postsData, null, 2));
-  process.exit(0);
+  return postsData;
 }
 
-// Get arguments from command line
-const category = process.argv[2] || "funny";
-const count = parseInt(process.argv[3] || "2", 10);
-scrape9Gag(category, count);
+// Only run when called directly (prevents auto execution when imported)
+if (require.main === module) {
+  const category = process.argv[2] || "funny";
+  const count = parseInt(process.argv[3] || "2", 10);
+
+  scrape9Gag(category, count)
+    .then(data => {
+      console.log("✅ Scraping complete. Returning results:");
+      console.log(JSON.stringify(data, null, 2));
+    })
+    .catch(err => {
+      console.error("❌ Unexpected error:", err);
+    });
+}
